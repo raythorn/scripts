@@ -1,14 +1,21 @@
 #!/bin/bash
 
 CURL_PKG="curl-7.53.1.tar.gz"
+CURL_TARGET=libcurl.a
+CURL_DEBUG=""
 
-if [ $# -gt 1 ]; then
-	echo "Usage: $0 [version]"
+if [ $# -gt 2 ]; then
+	echo "Usage: $0 [version] [debug]"
 	exit 1
 fi
 
-if [ $# -eq 1 ];then
+if [ $# -gt 1 ] && [ "$1" != "debug" ];then
     CURL_PKG="curl-$1.tar.gz"
+fi
+
+if [ "$1" = "debug" ] || [ "$2" = "debug" ];then
+    CURL_TARGET=libcurld.a
+    CURL_DEBUG="-g -gmodules"
 fi
 
 CURL_SRC=${CURL_PKG//.tar*/}
@@ -59,7 +66,7 @@ HOST_VAL=$2
 IOS_SDK=$3
 
 export CC="${GCC}"
-export CFLAGS="-mios-version-min=7.0 -arch ${ARCH} -isysroot ${IOS_SDK}"
+export CFLAGS="${CURL_DEBUG} -mios-version-min=7.0 -arch ${ARCH} -isysroot ${IOS_SDK}"
 
 make clean &> ${CURL_BUILD_LOG}/make_clean.log
 
@@ -85,7 +92,7 @@ done
 
 
 LIB_SRC=lib/libcurl.a
-LIB_DST=${CURL_UNIVERSAL_LIB}/libcurl.a
+LIB_DST=${CURL_UNIVERSAL_LIB}/${CURL_TARGET}
 LIB_PATHS=(${ARCHS[@]/#/${CURL_BUILD}/})
 LIB_PATHS=(${LIB_PATHS[@]/%//${LIB_SRC}})
 
@@ -93,8 +100,9 @@ lipo ${LIB_PATHS[@]} -create -output ${LIB_DST}
 
 
 cp -a ${CURL_BUILD}/arm64/include ${CURL_BUILD_UNIVERSAL}
-cp ${CURL_BUILD}/arm64/include/curl/curlbuild.h ${CURL_BUILD_UNIVERSAL}/curl/curlbuild-64.h
-echo -e "#if defined(__LP64__) && __LP64__ \n#include \"curlbuild-64.h\" \n#else \n#include \"curlbuild-32.h\" \n#endif" &> ${CURL_BUILD_UNIVERSAL_DIR}/curl/curlbuild.h
+cp ${CURL_BUILD}/arm64/include/curl/curlbuild.h ${CURL_BUILD_UNIVERSAL}/include/curl/curlbuild-64.h
+cp ${CURL_BUILD}/armv7/include/curl/curlbuild.h ${CURL_BUILD_UNIVERSAL}/include/curl/curlbuild-32.h
+echo -e "#if defined(__LP64__) && __LP64__ \n#include \"curlbuild-64.h\" \n#else \n#include \"curlbuild-32.h\" \n#endif" &> ${CURL_BUILD_UNIVERSAL}/include/curl/curlbuild.h
 
 popd
 
